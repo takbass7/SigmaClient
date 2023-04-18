@@ -1,0 +1,122 @@
+#include <Arduino.h>
+
+
+int i;
+int speed = 921600; // this is max speed
+int speed_01 = 9600;
+int blinkFQ = 1000;
+
+#define LED 13
+#define RLED 12
+#define PUSHBUTTON 2
+
+#define RXD2 16
+#define TXD2 17
+
+unsigned long myTime;
+boolean isLEDOn = false;
+
+String inputString = "";
+bool stringComplete = false;
+
+
+//--- Custome function ---
+void Sign() {
+    unsigned long newTime = millis();
+
+    if (myTime !=newTime) {
+        myTime = newTime;
+
+        if (myTime % blinkFQ == 0)  {
+          //--Cycel every 1 Sec
+            if (isLEDOn) {
+                digitalWrite(LED_BUILTIN, LOW);
+                digitalWrite(LED,LOW);
+            } else {
+                digitalWrite(LED_BUILTIN, HIGH);
+                digitalWrite(LED,HIGH);
+            }
+            //--- revert LED
+            isLEDOn = !isLEDOn;
+        }
+    }
+}
+
+void btCommand(String cmd) {
+    cmd.trim();   //This line is need to clean up String
+
+    Serial2.println(cmd);
+    boolean newData = false;
+
+    while (newData == false) {
+      if (Serial2.available() > 0 ) {
+          String a = Serial2.readString();
+
+          Serial.print("BT05 > " + a);
+          newData = true;
+      }
+    }
+}
+
+
+//--- Arduino Main Skeleton ---
+void setup() {
+  // put your setup code here, to run once:
+  pinMode(LED_BUILTIN,OUTPUT);
+  pinMode(LED,OUTPUT);
+  pinMode(RLED,OUTPUT);
+  pinMode(PUSHBUTTON, INPUT);
+
+  //--Set USB Serial ---
+  Serial.begin(speed);
+  Serial.println("Serial 0 " + String(speed));
+
+  //--- Set Serial2 --- BT05
+  Serial2.begin(speed_01, SERIAL_8N1, RXD2, TXD2);
+  Serial.println("Serial 2 " + String(speed_01));
+
+  //--- Local Variable ---
+  inputString.reserve(200);
+  bool stringComplete = false;
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  Sign();
+
+  // Read From BT05
+  if (Serial2.available() > 0 ) {
+      String a = Serial2.readString();
+      a.trim();
+
+      Serial.println("Rec > " + a);
+      //--- Send back ---A
+      //Serial2.print("OK-" + a);
+      if (a == "ERROR") {
+        Serial.println("Got that");
+        btCommand("AT");
+      }
+  }
+
+
+   if (stringComplete) {
+      btCommand(inputString);
+      inputString = "";
+      stringComplete = false;
+  }
+
+}
+
+ void serialEvent() {
+  //--- Check for Serial Input ---
+  while (Serial.available()) {
+      char inChar = (char)Serial.read();
+
+      inputString += inChar;
+      Serial.print(inChar);
+
+      if (inChar == '\n') {
+        stringComplete = true;
+      }
+  }
+}
